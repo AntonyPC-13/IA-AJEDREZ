@@ -8,6 +8,7 @@ class InterfazAjedrez:
     def __init__(self):
         self.juego = Ajedrez960()
         self.nivel_dificultad = "Normal"
+        self.color_humano = "Blanco"  # Color que juega el humano
         self.casilla_seleccionada = None
         self.movimientos_posibles = []
         
@@ -70,6 +71,16 @@ class InterfazAjedrez:
         # Frame para controles
         self.frame_botones = tk.Frame(self.frame_controles, bg='white')
         self.frame_botones.pack(side=tk.RIGHT)
+        
+        # Selector de color
+        tk.Label(self.frame_botones, text="Tu color:", font=self.fuente_secundaria, 
+                fg=self.colores['texto_secundario'], bg='white').pack(side=tk.LEFT, padx=(0, 5))
+        
+        self.combo_color = ttk.Combobox(self.frame_botones, values=["Blanco", "Negro"],
+                                      state="readonly", width=8)
+        self.combo_color.set(self.color_humano)
+        self.combo_color.pack(side=tk.LEFT, padx=(0, 10))
+        self.combo_color.bind('<<ComboboxSelected>>', self.cambiar_color)
         
         # Selector de dificultad
         tk.Label(self.frame_botones, text="Dificultad:", font=self.fuente_secundaria, 
@@ -201,16 +212,25 @@ class InterfazAjedrez:
         if not (0 <= fila <= 7 and 0 <= col <= 7):
             return
         
-        # Si es turno de la máquina, no permitir clicks
-        if self.juego.turno == 'N':
+        # Verificar si es turno del humano
+        turno_humano = (self.juego.turno == 'B' and self.color_humano == "Blanco") or \
+                      (self.juego.turno == 'N' and self.color_humano == "Negro")
+        
+        if not turno_humano:
             return
         
         # Si no hay casilla seleccionada, seleccionar esta
         if self.casilla_seleccionada is None:
-            if self.juego.tablero[fila][col] != '.' and self.juego.tablero[fila][col].islower():
-                self.casilla_seleccionada = (fila, col)
-                self.movimientos_posibles = self.juego.obtener_movimientos_validos(fila, col)
-                self.actualizar_display()
+            pieza = self.juego.tablero[fila][col]
+            if pieza != '.':
+                # Verificar si la pieza pertenece al humano
+                es_pieza_humana = (self.color_humano == "Blanco" and pieza.islower()) or \
+                                 (self.color_humano == "Negro" and pieza.isupper())
+                
+                if es_pieza_humana:
+                    self.casilla_seleccionada = (fila, col)
+                    self.movimientos_posibles = self.juego.obtener_movimientos_validos(fila, col)
+                    self.actualizar_display()
         else:
             # Intentar realizar movimiento
             fila_origen, col_origen = self.casilla_seleccionada
@@ -235,7 +255,11 @@ class InterfazAjedrez:
     
     def movimiento_maquina(self):
         """Realiza el movimiento de la máquina"""
-        if self.juego.juego_terminado or self.juego.turno != 'N':
+        # Verificar si es turno de la máquina
+        turno_maquina = (self.juego.turno == 'B' and self.color_humano == "Negro") or \
+                       (self.juego.turno == 'N' and self.color_humano == "Blanco")
+        
+        if self.juego.juego_terminado or not turno_maquina:
             return
         
         # Obtener mejor movimiento según la dificultad
@@ -298,7 +322,10 @@ class InterfazAjedrez:
     def actualizar_informacion(self):
         """Actualiza la información del juego"""
         # Turno actual
-        turno_texto = "Turno: Blanco (Humano)" if self.juego.turno == 'B' else "Turno: Negro (Máquina)"
+        if self.juego.turno == 'B':
+            turno_texto = f"Turno: Blanco ({'Humano' if self.color_humano == 'Blanco' else 'Máquina'})"
+        else:
+            turno_texto = f"Turno: Negro ({'Humano' if self.color_humano == 'Negro' else 'Máquina'})"
         self.label_turno.config(text=turno_texto)
         
         # Estado de los reyes
@@ -337,6 +364,23 @@ class InterfazAjedrez:
             self.text_historial.insert(tk.END, texto)
             self.text_historial.see(tk.END)
     
+    def cambiar_color(self, event):
+        """Cambia el color que juega el humano"""
+        self.color_humano = self.combo_color.get()
+        # Reiniciar el juego cuando se cambia el color
+        self.juego.resetear_juego()
+        
+        # Si el humano elige Negro, cambiar el turno para que empiece el humano
+        if self.color_humano == "Negro":
+            self.juego.turno = 'N'  # Cambiar a turno de Negro
+        
+        self.casilla_seleccionada = None
+        self.movimientos_posibles = []
+        self.text_historial.delete(1.0, tk.END)
+        self.actualizar_display()
+        messagebox.showinfo("Color Cambiado", 
+                           f"Ahora juegas con las piezas {self.color_humano.lower()}s. ¡Nuevo juego iniciado!")
+    
     def cambiar_dificultad(self, event):
         """Cambia el nivel de dificultad de la IA"""
         self.nivel_dificultad = self.combo_dificultad.get()
@@ -346,26 +390,40 @@ class InterfazAjedrez:
     def nuevo_juego(self):
         """Inicia un nuevo juego"""
         self.juego.resetear_juego()
+        
+        # Si el humano elige Negro, cambiar el turno para que empiece el humano
+        if self.color_humano == "Negro":
+            self.juego.turno = 'N'  # Cambiar a turno de Negro
+        
         self.casilla_seleccionada = None
         self.movimientos_posibles = []
         self.text_historial.delete(1.0, tk.END)
         self.actualizar_display()
-        messagebox.showinfo("Nuevo Juego", "¡Nuevo juego iniciado!")
+        messagebox.showinfo("Nuevo Juego", f"¡Nuevo juego iniciado! Juegas con las piezas {self.color_humano.lower()}s")
     
     def rendirse(self):
         """El jugador se rinde"""
         if messagebox.askyesno("Rendirse", "¿Estás seguro de que quieres rendirte?"):
             self.juego.juego_terminado = True
-            self.juego.resultado = "Victoria para el negro"
+            if self.color_humano == "Blanco":
+                self.juego.resultado = "Victoria para el negro"
+            else:
+                self.juego.resultado = "Victoria para el blanco"
             self.mostrar_resultado()
     
     def mostrar_resultado(self):
         """Muestra el resultado del juego"""
         if self.juego.resultado:
             if "Victoria para el blanco" in self.juego.resultado:
-                mensaje = "¡Felicidades! Has ganado."
+                if self.color_humano == "Blanco":
+                    mensaje = "¡Felicidades! Has ganado."
+                else:
+                    mensaje = "La máquina ha ganado. ¡Mejor suerte la próxima vez!"
             elif "Victoria para el negro" in self.juego.resultado:
-                mensaje = "La máquina ha ganado. ¡Mejor suerte la próxima vez!"
+                if self.color_humano == "Negro":
+                    mensaje = "¡Felicidades! Has ganado."
+                else:
+                    mensaje = "La máquina ha ganado. ¡Mejor suerte la próxima vez!"
             else:
                 mensaje = "El juego ha terminado en empate."
             
