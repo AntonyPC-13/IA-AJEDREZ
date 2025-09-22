@@ -1,4 +1,4 @@
-# Ajedrez 960 - Humano vs Máquina
+# Ajedrez 960 - Humano vs Máquina curso de IA
 
 ## Descripción
 
